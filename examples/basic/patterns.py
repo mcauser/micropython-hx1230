@@ -74,3 +74,23 @@ for i in range(9):
     for j in range(12):
         for k in range(8):
             lcd.data(255 >> k)
+
+# \\\\
+lcd.clear()
+lcd.data(bytearray([0x11,0x22,0x44,0x88]*216))
+
+# ////
+lcd.clear()
+lcd.data(bytearray([0x88,0x44,0x22,0x11]*216))
+
+# \/\/
+lcd.clear()
+lcd.data(bytearray([0x81,0x42,0x24,0x18]*216))
+
+# ||||
+lcd.clear()
+lcd.data(bytearray([0xff,0x00]*432))
+
+# ====
+lcd.clear()
+lcd.data(bytearray([0x55]*864))
