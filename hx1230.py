@@ -169,10 +169,10 @@ class HX1230_SPI(HX1230):
         super().__init__(cs, rst)
 
     def hal_spi_write(self, dc, value):
-        self.cs(0)
         self.cmd[0] = DATA if dc else 0    # MSB is D/C
         self.cmd[0] |= (value >> 1)        # high 7 bits of value
         self.cmd[1] = ((value & 1) << 7)   # low 1 bit of value
+        self.cs(0)
         self.spi.write(self.cmd)
         self.cs(1)
 
