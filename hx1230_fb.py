@@ -152,11 +152,7 @@ class HX1230_FB(framebuf.FrameBuffer):
         self.hal_spi_write(0, command)
 
     def data(self, data):
-        if isinstance(data, int):
-            self.hal_spi_write(1, data)
-        else:
-            for b in data:
-                self.hal_spi_write(1, b)
+        self.hal_spi_write(1, data)
 
     def hal_spi_write(self, dc, value):
         """Writes to the LCD.
@@ -166,9 +162,9 @@ class HX1230_FB(framebuf.FrameBuffer):
 
 
 class HX1230_FB_SPI(HX1230_FB):
-    """Implements a HX1230 using 16-bit SPI
+    """Implements a HX1230 using 8-bit SPI
     Bits are sent MSB first. DC is the MSB, followed by 8 bits of data.
-    Remaining 7 bits are zeros and ignored by the display.
+    Supports sending multiple bytes. 8 bytes sent as 9 including a DC bit for each.
     """
     def __init__(self, spi, cs, rst=None):
         self.spi = spi           # max serial rate 4 MBit/s
@@ -176,12 +172,37 @@ class HX1230_FB_SPI(HX1230_FB):
         super().__init__(cs, rst)
 
     def hal_spi_write(self, dc, value):
+        if isinstance(value, int):
+            self._spi_write_one(dc, value)
+        else:
+            self._spi_write_many(dc, value)
+
+    def _spi_write_one(self, dc, value):
+        # if only sending one value, send 2 bytes left aligned with padding bits
         self.cmd[0] = DATA if dc else 0    # MSB is D/C
         self.cmd[0] |= (value >> 1)        # high 7 bits of value
         self.cmd[1] = ((value & 1) << 7)   # low 1 bit of value
         self.cs(0)
         self.spi.write(self.cmd)
         self.cs(1)
+
+    def _spi_write_many(self, dc, value):
+        # for each 8 bytes, send 9 bytes (incl a DC bit for each)
+        for i in range(0, len(value), 8):
+            block = value[i:i+8]
+            cmd = bytearray(9)
+            l = len(block)
+            for j in range(l):
+                if dc:
+                    cmd[j] |= (1 << (7-j))  # DC bit
+                if j == 7:
+                    cmd[j+1] = block[j]  # DC on prev 7th byte means this one is no change
+                else:
+                    cmd[j] |= block[j] >> (j+1)
+                    cmd[j+1] |= (block[j] << (7-j)) & 0xff
+            self.cs(0)
+            self.spi.write(cmd if l == 8 else cmd[0:l+1])
+            self.cs(1)
 
 
 class HX1230_FB_BBSPI(HX1230_FB):
@@ -194,6 +215,13 @@ class HX1230_FB_BBSPI(HX1230_FB):
         super().__init__(cs, rst)
 
     def hal_spi_write(self, dc, value):
+        if isinstance(value, int):
+            self._spi_write_one(dc, value)
+        else:
+            for val in value:
+                self._spi_write_one(dc, val)
+
+    def _spi_write_one(self, dc, value):
         self.cs(0)
         self.mosi(dc)  # MSB is D/C
         self.sck(1)
